@@ -1,0 +1,12 @@
+{
+    "cdn":
+        {
+            "file_name": "blah",
+            "hits": 5
+        },
+    "user":
+        {
+            "first_name": "blah",
+            "company_name": "blah",
+        }
+}
