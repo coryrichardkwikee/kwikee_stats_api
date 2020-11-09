@@ -127,7 +127,7 @@ public static Int64 insertInto(ILogger log, SqlConnection connection, string tab
     Int64 pkid;
     if (obj == DBNull.Value)
     {
-        pkid = 0;
+        pkid = (Int64)0;
     }
     else
     {
@@ -147,12 +147,12 @@ public static async Task<IActionResult> Run(HttpRequest req, ILogger log)
     dynamic resp = new JObject();
     resp.status = "success"; // default assumption
     resp.inserted = new JObject();
-    JObject data = null;
+    // JObject data = null;
 
     try
     {
         // Database connection string - this should be better placed at the Function settings level.
-        var cnnString = "Server=kwikeecontentlog.LogInformationdatabase.windows.net;Database=Kwikee_Stats; User ID=schrappe;Password=B@mt18011994";
+        var cnnString = "Server=kwikeecontentlog.database.windows.net;Database=Kwikee_Stats; User ID=schrappe;Password=B@mt18011994";
         using(var connection = new SqlConnection(cnnString))
         {
             connection.Open();
@@ -161,7 +161,7 @@ public static async Task<IActionResult> Run(HttpRequest req, ILogger log)
             // Get request body
             string requestBody = await new StreamReader(req.Body).ReadToEndAsync();
             log.LogInformation("test" + requestBody);
-            dynamic data = JsonConvert.DeserializeObject(requestBody);
+            JObject data = JsonConvert.DeserializeObject<JObject>(requestBody);
 
             // if there is an event key in the JSON body, insert the record
             string[] tables = {"image","product","user","event"};
@@ -185,6 +185,6 @@ public static async Task<IActionResult> Run(HttpRequest req, ILogger log)
         resp.details = e.ToString();
     }
 
-     return new OkObjectResult( new{ (JObject)resp}, "application/json");
+     return new OkObjectResult(resp);
 
 }

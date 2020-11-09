@@ -1,11 +1,6 @@
 {
-    "cdn":
-        {
-            "file_name": "blah",
-            "hits": 5
-        },
     "user":
-        {
+        {   "email": "blah",
             "first_name": "blah",
             "company_name": "blah",
         }
