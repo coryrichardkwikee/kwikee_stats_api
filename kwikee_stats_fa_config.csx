@@ -184,7 +184,8 @@ public static async Task<IActionResult> Run(HttpRequest req, ILogger log)
         resp.status = "error";
         resp.details = e.ToString();
     }
-
-     return new OkObjectResult(resp);
-
+    log.LogInformation("status code: " + statusCode );
+    return new ObjectResult(resp) {
+        StatusCode = (int)statusCode,
+    };
 }
