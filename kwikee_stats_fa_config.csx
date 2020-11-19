@@ -16,9 +16,13 @@ using Newtonsoft.Json.Linq;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Primitives;
 
-public static Int64 insertInto(ILogger log, SqlConnection connection, string tableName, JObject data)
+
+public static class Constants
 {
-    Dictionary<string, string[]> tables = new Dictionary<string, string[]>() {
+    // public static readonly Dictionary<string, string[]> pk_fields = new Dictionary<string, string[]>{
+    //     {}
+    }
+    public static readonly Dictionary<string, string[]> tables = new Dictionary<string, string[]>() {
         {"image", new string[] {
         	"image_asset_id",
             "order_asset_id",
@@ -90,13 +94,17 @@ public static Int64 insertInto(ILogger log, SqlConnection connection, string tab
             "kwikeesystems_user_id"
         } }
     };
+}
+public static Int64 insertInto(ILogger log, SqlConnection connection, string tableName, JObject data)
+{
+
 
     SqlCommand command = new SqlCommand();
     command.Connection = connection;
 
     // build a list of only the fields that we received in JSON
     List<string> subset = new List<string>();
-    foreach (string f in tables[tableName]) {
+    foreach (string f in Constants.tables[tableName]) {
         if ( data[f] != null ) {
             subset.Add(f);
         }
@@ -125,7 +133,7 @@ public static Int64 insertInto(ILogger log, SqlConnection connection, string tab
 
     var obj = command.ExecuteScalar();
     Int64 pkid;
-    if (obj == DBNull.Value)
+    if (obj == null)
     {
         pkid = (Int64)0;
     }
@@ -140,6 +148,59 @@ public static Int64 insertInto(ILogger log, SqlConnection connection, string tab
     return pkid;
 }
 
+public static Int64 replaceInto(ILogger log, SqlConnection connection, string tableName, JObject data)
+{
+    SqlCommand command = new SqlCommand();
+    command.Connection = connection;
+
+    // build a list of only the fields that we received in JSON
+    List<string> subset = new List<string>();
+    foreach (string f in Constants.tables[tableName]) {
+        if ( data[f] != null ) {
+            subset.Add(f);
+        }
+    }
+
+    if (subset.Count == 0) {
+        throw new System.ArgumentException("No recognized fields found for "+tableName);
+    }
+
+    string sql = "INSERT INTO dbo.[" + tableName +
+        "] (" +
+        string.Join(", ", subset) + ") values (@" +
+        string.Join(", @", subset) + ")"
+        + ";SELECT CAST(SCOPE_IDENTITY() AS BIGINT);";
+
+    log.LogInformation("SQL: " + sql);
+    command.CommandText = sql;
+    command.Prepare();
+
+    // foreach (string f in tables[tableName]) {
+    foreach (string f in subset) {
+        log.LogInformation("..f: " + f);
+        command.Parameters.AddWithValue("@"+f, data[f].Value<string>());
+    }
+    log.LogInformation("Getting ready to insert into " + tableName);
+
+    var obj = command.ExecuteScalar();
+    Int64 pkid;
+    if (obj == null)
+    {
+        pkid = (Int64)0;
+    }
+    else
+    {
+        pkid = (Int64)obj;
+    }
+    // Int64 pkid = (Int64)command.ExecuteScalar();
+
+    log.LogInformation("..inserted:" + pkid.ToString());
+    // log.LogInformation("..inserted");
+    return pkid;
+}
+
+
+
 public static async Task<IActionResult> Run(HttpRequest req, ILogger log)
 {
     log.LogInformation("C# HTTP trigger function processed a request.");
@@ -147,7 +208,7 @@ public static async Task<IActionResult> Run(HttpRequest req, ILogger log)
     dynamic resp = new JObject();
     resp.status = "success"; // default assumption
     resp.inserted = new JObject();
-    // JObject data = null;
+    resp.updated = new JObject();
 
     try
     {
@@ -163,17 +224,33 @@ public static async Task<IActionResult> Run(HttpRequest req, ILogger log)
             log.LogInformation("test" + requestBody);
             JObject data = JsonConvert.DeserializeObject<JObject>(requestBody);
 
-            // if there is an event key in the JSON body, insert the record
+            // Get request method
+            string req_method = req.Method;
+            log.LogInformation("Request Method:" + req_method);
             string[] tables = {"image","product","user","event"};
-            foreach (string table in tables) {
-                if (data[table] != null) {
-                    log.LogInformation("sending "+table+" data");
-                    // log.LogInformation(data["event"].ToString());
-                    Int64 pkid = insertInto(log, connection, table, data[table].Value<JObject>());
-                    resp.inserted.Add(table, pkid);
-                } // if
-            } // foreach
 
+            if (req.Method == "POST"){
+                // if there is an event key in the JSON body, insert the record
+                foreach (string table in tables) {
+                    if (data[table] != null) {
+                        log.LogInformation("sending "+table+" data");
+                        // log.LogInformation(data["event"].ToString());
+                        Int64 pkid = insertInto(log, connection, table, data[table].Value<JObject>());
+                        resp.inserted.Add(table, pkid);
+                    } // if
+                } // foreach
+            }
+            else if (req.Method == "PUT"){
+                // if there is an event key in the JSON body, insert the record
+                foreach (string table in tables) {
+                    if (data[table] != null) {
+                        log.LogInformation("sending "+table+" data");
+                        // log.LogInformation(data["event"].ToString());
+                        Int64 pkid = replaceInto(log, connection, table, data[table].Value<JObject>());
+                        resp.updated.Add(table, pkid);
+                    } // if
+                } // foreach
+            }
             connection.Close();
         }
     }
